@@ -60,7 +60,18 @@ x <- 1 ; y <- c(3, 4)
 (3.1) Insert a new R code chunk below.
 
 ```{r}
-
+wb = read.csv("WB_2024.csv")
+dim(wb)
+names(wb)
+head(wb, 5)
+sapply(wb, class)
+# GNI has class integer
+wb_Subset <- wb[wb$GNI > 70000 & is.na(wb$GNI)==F,c("Country", "GNI", "EnergyUse", "Measles")]
+wb_Subset
+wb_Stats <- summary(wb["Debt"], digits = 2)
+wb_Stats
+length(wb_Stats)
+wb_Stats[c(1, 2, 3, 5, 6)]
 ```
 
 (3.2) Read the .csv stored [HERE](http://reuningscherer.net/S&DS230/data/WB_2024.csv) into a new data frame and call is "wb". This is similar to the World Bank data I discussed in class two (this is a more current version). You can get the longer description of each variable [HERE](http://reuningscherer.net/S&DS230/data/WB_2024_NMS.csv)
@@ -89,6 +100,16 @@ x <- 1 ; y <- c(3, 4)
 
 (4.2) Make a boxplot of the the following `wb` variables that are all percentages: `Measles`, `Military`, `Renewable`, `Rural`. You want all four variables on one plot. Ensure the plot has a main title, axis labels, and a unique color for each variable.
 
+```{r}
+plot(wb$Rural, wb$Measles, xlab="Rural", ylab="Measles", main="Scatterplot of Rural vs Measles", col="Blue", pch='x')
+boxplot(wb$Measles, wb$Military, wb$Rural, wb$Renewable, 
+        names=c("Measles", "Military", "Renewable", "Rural"), 
+        main="Boxplot of Various Country Facts",
+        ylab="Percentage",
+        col=c("Orange", "Red", "Green", "Brown"), 
+        lwd=2)
+```
+
 **(5) Lists** *12 pts* The code below creates a list called `aList`
 
 (5.1) Compute the sum of the second element of the list's third element. Store the result into an object named `mySum`. You'll want to use the `sum()` function.
@@ -96,6 +117,8 @@ x <- 1 ; y <- c(3, 4)
 ```{r}
 aList <- list(c(1, 5, 4), letters[c(1, 6, 4, 9, 22, 3)], list(c(1, 1, 1), 
                         c(14, 13, 12), c(3, 2, 1)), c(runif(8)))
+mySum <- sum(aList[[3]][[2]])
+mySum
 ```
 
 (5.2) What is the difference between what is returned from the following two commands?
@@ -106,7 +129,7 @@ aList[[3]][2]
 aList[[3]][[2]]
 ```
 
-*replace this text with your answer AND your answer should be in italics when knitted*
+*Both commands have the same first part, aList[[3]], which extracts the third element in aList, which is list(c(1, 1, 1), c(14, 13, 12), c(3, 2, 1)). The first command, which has [2], returns the second element of this list contained in a 1-element list, or list(c(14, 13, 12)). The second command, which has [[2]], just returns the second element of the list, which is c(14, 13, 12).*
 
  \
      
