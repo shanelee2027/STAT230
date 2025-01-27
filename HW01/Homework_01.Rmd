@@ -29,7 +29,9 @@ knitr::opts_chunk$set(echo = TRUE)
 
 [**LINK**](https://www.nytimes.com/) (make the word LINK at left link to the New York Times home page AND make it bold)
 
-`Make this line look like R Code`
+``` r
+Make this line look like R Code
+```
 
 Below this line, insert a new R chunk, create a vector called `xvec` that contains the integers 5 through 9, and have R display what is in `xvec`.
 
@@ -41,17 +43,18 @@ xvec
 **(2) R Syntax Practice** *(12 points)* Modify the R code below to follow good R Syntax practices
 
 ```{r, eval = FALSE}
-x = 5
+x <- 5
 
-x<=c(1, 2, 3)
+x <- c(1, 2, 3)
 
-length (x)
+length(x)
 
-for (i in 1:10) { 
-x <-1+1 
-           }
+for (i in 1:10) {
+  x <- 1+1
+}
 
-x <- 1 ; y <- c(3, 4)
+x <- 1
+y <- c(3, 4)
 
 ```
 
@@ -60,13 +63,14 @@ x <- 1 ; y <- c(3, 4)
 (3.1) Insert a new R code chunk below.
 
 ```{r}
-wb = read.csv("WB_2024.csv")
+wb <- read.csv("http://reuningscherer.net/S&DS230/data/WB_2024.csv")
 dim(wb)
 names(wb)
 head(wb, 5)
 sapply(wb, class)
-# GNI has class integer
-wb_Subset <- wb[wb$GNI > 70000 & is.na(wb$GNI)==F,c("Country", "GNI", "EnergyUse", "Measles")]
+# class(wb[, "GNI"])
+wb_Subset <- wb[wb$GNI > 70000 & is.na(wb$GNI)==F,
+                c("Country", "GNI", "EnergyUse", "Measles")]
 wb_Subset
 wb_Stats <- summary(wb["Debt"], digits = 2)
 wb_Stats
@@ -101,7 +105,11 @@ wb_Stats[c(1, 2, 3, 5, 6)]
 (4.2) Make a boxplot of the the following `wb` variables that are all percentages: `Measles`, `Military`, `Renewable`, `Rural`. You want all four variables on one plot. Ensure the plot has a main title, axis labels, and a unique color for each variable.
 
 ```{r}
-plot(wb$Rural, wb$Measles, xlab="Rural", ylab="Measles", main="Scatterplot of Rural vs Measles", col="Blue", pch='x')
+plot(wb$Rural, wb$Measles, 
+     xlab="Rural", 
+     ylab="Measles", 
+     main="Scatterplot of Rural vs Measles", 
+     col="Blue", pch='x')
 boxplot(wb$Measles, wb$Military, wb$Rural, wb$Renewable, 
         names=c("Measles", "Military", "Renewable", "Rural"), 
         main="Boxplot of Various Country Facts",
