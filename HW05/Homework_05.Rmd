@@ -1,0 +1,302 @@
+---
+title: "Homework 05 Functions and Permutation Tests"
+output:
+  pdf_document: 
+     fig_height: 5
+     fig_width : 7
+  word_document: 
+     fig_height: 5
+     fig_width : 7
+  html_document: default
+subtitle: Due by 11:59pm, Friday, February 21, 2025, 11:59pm
+author: S&DS 230/530/ENV 757
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Questions 1 and 2 use data from both 2017 and 2018 New Haven Road Races - in particular, we look at 5k run times. You can get data for [2018 HERE](http://reuningscherer.net/s&ds230/data/NHRR2018.csv) and for [2017 HERE](http://reuningscherer.net/s&ds230/data/NHRR2017.csv).
+
+**1) Function for Data Cleaning** *(20 points)*
+
+(1.1) *(5 pts)* Load in both .csv files into objects called `nh2017` and `nh2018`. Use `head()`, `names()`, and `str()` to check if both datasets have the same variable names and the same format (i.e does each variable have the same format in each dataset). Comment on what you observe.
+
+```{r}
+nh2017 <- read.csv("http://reuningscherer.net/s&ds230/data/NHRR2017.csv")
+nh2018 <- read.csv("http://reuningscherer.net/s&ds230/data/NHRR2018.csv")
+head(nh2017)
+head(nh2018)
+names(nh2017)
+names(nh2018)
+```
+
+*The two datasets do have the same variable names and format.*
+
+(1.2) *(15 pts)* Since the two datasets seem to have the same structure, we can write a function that creates new variables in each dataset. This function will be called `cleanNHData()`. As a first step, I've already included code to load the `lubridate` package and define a function called `convertTimes()` similar to that we used in Class 10.
+
+I've started the outline of the function below. Your job is to follow the exact process we used in class 9 to clean the 2018 data. You need to replace each comment line in the `cleanNHData()` function with the code that will perform this task. You literally just need to find the relevant line in the class code and put this into the `cleanNHData()` function. The one exception is a new line you'll need to write that deletes rows where `Name` is missing (i.e. equal to "")
+
+Then, run the function on `nh2017` and `nh2018` to replace each of these datasets with the cleaned up version of themselves.
+
+```{r}
+library(lubridate)
+convertTimes <- function(v) {
+  hourplus <- nchar(v) == 7
+  wrongformat <- nchar(v) == 8
+  outtimes <- ms(v)
+  if (sum(hourplus) > 0) { # if there is at least 1 time that exceeds 1 hr
+    outtimes[hourplus] <- hms(v[hourplus])
+  }
+  if (sum(wrongformat) > 0) { # if there is at least 1 time in wrong format
+    outtimes[wrongformat] <- ms(substr(v[wrongformat],1,5))
+  }
+  outtimes <- as.numeric(outtimes)/60
+  return(outtimes)
+}
+
+cleanNHData <- function(data) {
+  data[data$Div == "",]$Div <- NA
+  data$Gender <- substr(data$Div, 1, 1)
+  data$AgeGrp <- substr(data$Div, 2, nchar(data$Div))
+  data$Nettime_min <- convertTimes(data$Nettime)
+  data$Time_min <- convertTimes(data$Time)
+  data$Pace_min <- convertTimes(data$Pace)
+  data <- data[data$Name != "", ]                      
+  
+  return(data)                                         
+}
+
+#run cleanNHData on nh2018 and nh2017 and replace these with the cleaned up 
+# versions of themselves
+nh2017 <- cleanNHData(nh2017)
+nh2018 <- cleanNHData(nh2018)
+head(nh2017, 10)
+head(nh2018, 10)
+```
+
+**2) Repeat Runners Dataset** *(35 points)*
+
+We now create a dataset that looks at times of runners who ran in both 2018 and 2017.
+
+(2.1) *(5 pts)* We'll have problems if we have instances of two runners having the same name. A crude fix is to delete the second occurance of anyone with a duplicate name.
+
+Run the code below to see how the function `duplicated()` works:
+
+```{r}
+
+duplicated(c("cat", "cat", "dog", "llama"))
+
+```
+
+Esentially, this returns a vector that is `FALSE` if an observation value is the first occurrence of this value and `TRUE` when a value has been seen before.
+
+To merge our two datasets, we need to start with unique `Name` values in each dataset. Using the `duplicated()` function, create two new dataframes called `nh2018Unq` and `nh2017Unq` so that each only retains observations for the first occurence of each value of `Name` (if you use the `!` operator, this is two short lines of code).
+
+Get the dimensions of each of the four relevant dataframes. How many observations were eliminated from each year?
+
+```{r}
+nh2017Unq <- nh2017[!duplicated(nh2017$Name),]
+nh2018Unq <- nh2018[!duplicated(nh2018$Name),]
+dim(nh2017)
+dim(nh2017Unq)
+dim(nh2018)
+dim(nh2018Unq)
+```
+
+*Based on the difference in the number of rows between the original dataframes and the new ones, 7 observations from 2017 and 45 observations from 2018 were eliminated.*
+
+(2.2) *(5 pts)* Next, we need to get a list of names that occur in both datasets. Run the code below to see how the `intersect()` function works.
+
+```{r}
+intersect(c("cat", "dog", "llama"), c("cat", "llama", "chincilla"))
+```
+
+Using the `intersect()` function, create an object called `repeatrunners` that is a list of names of people who ran in both years. How many runners ran in both years?
+
+```{r}
+repeatrunners <- intersect(nh2017Unq$Name, nh2018Unq$Name)
+length(repeatrunners)
+```
+
+*986 people ran in both years.*
+
+(2.3) *(15 pts)* The code below will create a combined dataset called `nhcombined`. Your job in this section is to write a one or two line comment above each line of code to describe what the line does. You'll want to run each line, probably see what the result was, and in some cases use the help file for some functions to see what the function does (i.e. for the `merge()` function). Make sure you remove `eval = FALSE` in the r chunk.
+
+```{r}
+# creates a boolean vector that is "TRUE" if the observation name is in
+# repeatrunners and "FALSE" otherwise
+w <- nh2018Unq$Name %in% repeatrunners 
+
+# creates a new dataframe from the 2018 dataset containing only the names, 
+# genders, and net times of repeat runners (entries where Name is in w).
+nhcombined <- data.frame(Name = nh2018Unq$Name[w],
+                         Gender = nh2018Unq$Gender[w],
+                         Nettime_2018 = nh2018Unq$Nettime_min[w])
+
+# merges this new dataframe with the 2017 dataset. Since the only shared
+# variable between the two dataframes is "Name", this merges by Name, which
+# associates the 2018 net times with the right 2017 net times. since nhcombined
+# only contains 2018 entries from repeat runners, non-repeat runners from 2017
+# are dropped
+nhcombined <- merge(nhcombined, nh2017Unq[, c("Name", "Nettime_min")])
+
+# drops the rows with unspecified gender
+nhcombined <- nhcombined[!is.na(nhcombined$Gender),]
+
+# replaces the name of the column "Nettime_min" to "Nettime_2017"
+colnames(nhcombined)[4] <- "Nettime_2017"
+
+# prints the dimensions of the new dataframe
+dim(nhcombined)
+
+# prints the first few rows of the new dataframe
+head(nhcombined)
+
+```
+
+(2.4) *(5 pts)* Create a new variable in the data frame `nhcombined` called `improvement` that is the improvement in run time from 2017 to 2018 (a positive number here should indicate an improvement,a negative number means they did worse in 2018). Get summary statistics for `nhcombined`. Then make a histogram of `improvement`. Comment on the summary statistics and what you observe in the histogram.
+
+```{r}
+nhcombined$improvement <- nhcombined$Nettime_2017 - nhcombined$Nettime_2018
+summary(nhcombined$improvement)
+hist(nhcombined$improvement,
+     breaks=50,
+     xlab="Improvement (minutes)",
+     main="Improvement in Runners' Times from 2017 to 2018")
+```
+
+*Both the median and mean are negative, which means that in general, the runners got worse from 2017 to 2018. It's hard to see the specifics in the histogram though since the outliers cause the bins to be rather large.*
+
+(2.5) *(5 pts)* You'll notice a few extreme values (i.e. people got amazingly better or worse). Print the rows of `nhcombined` that had improvement times of more than 50 in absolute value. Update the `nhcombined` dataframe to exclude these rows and make the histogram again.
+
+```{r}
+nhcombined[abs(nhcombined$improvement) > 50,]
+nhcombined <- nhcombined[abs(nhcombined$improvement) <= 50,]
+hist(nhcombined$improvement,
+     breaks=50,
+     xlab="Improvement (minutes)",
+     main="Improvement in Runners' Times from 2017 to 2018,
+           Outliers Excluded")
+```
+
+**3) Changes in Measles Vaccination Rates in the Past 8 Years** *(45 pts)*
+
+Question 3 uses data from from the 2016 and 2024 World Bank datasets. You can get data for [2016 HERE](http://reuningscherer.net/S&DS230/data/WB.2016.csv) and for [2024 HERE](http://reuningscherer.net/S&DS230/data/WB_2024.csv).
+
+(3.1) *(10 pts)* Read in the datasets. Get and show the names on each dataset. Confirm that the dimensions are the same between datasets. Then, modify each dataset so that it only contains "Country", "Measles", and "GNI".
+
+Following the example in question 2, combine these datasets together. You'll need to rename "Measles" and "GNI" in each dataset before combining based on Country (something like "Measles_24", "Measles_16", etc.) In the combined dataset, remove any observations that are missing for either Measles variable or for GNI in 2024.
+
+Create a new factor variable that identifies countries as having GNI in 2024 greater than 8000 or less than or equal to 8000.
+
+Finally, calculate a variable that is the change in Measles vaccination rates (2024 minus 2016) per country.
+
+Show the first 10 rows of the final dataset.
+
+```{r}
+data2016 <- read.csv("http://reuningscherer.net/S&DS230/data/WB.2016.csv")
+data2024 <- read.csv("http://reuningscherer.net/S&DS230/data/WB_2024.csv")
+dim(data2016)
+dim(data2024)
+names(data2016)
+names(data2024)
+data2016 <- data2016[,c("Country", "Measles", "GNI")]
+data2024 <- data2024[,c("Country", "Measles", "GNI")]
+
+w <- data2016$Country %in% intersect(data2016$Country, data2024$Country)
+datacombined <- data.frame(Country = data2016$Country[w],
+                           Measles_2016 = data2016$Measles[w],
+                           GNI_2016 = data2016$GNI[w])
+datacombined <- merge(datacombined, data2024)
+colnames(datacombined)[4] = "Measles_2024"
+colnames(datacombined)[5] = "GNI_2024"
+datacombined <- datacombined[!(is.na(datacombined$Measles_2016) 
+                               | is.na(datacombined$Measles_2024)
+                               | is.na(datacombined$GNI_2024)),]
+datacombined$GNI_over_8000 <- factor(ifelse(datacombined$GNI_2024 > 8000, 
+                                            "yes", 
+                                            "no")) 
+datacombined$Measles_Diff <- (datacombined$Measles_2024 
+                              - datacombined$Measles_2016)
+head(datacombined, 10)
+```
+
+(3.2) *(10 pts)* Calculate and display summary statistics for the change in Measles vaccination rates overall. Make a histogram of these changes and add a vertical line at the value which indicates no change. Discuss what you observe in a few sentences.
+
+Make a side-by-side boxplot to see differences between the change in Measles vaccination rates between Countries with GNI \< 8000 and countries with GNI \> 8000. Does there appear to be any difference between groups? Comment both on center and spread.
+
+```{r}
+summary(datacombined$Measles_Diff)
+hist(datacombined$Measles_Diff,
+     breaks = 30,
+     xlab = "Change in Percentage Points",
+     main = "Change in Measles Vaccination Rate for Countries
+     from 2016 to 2024")
+abline(v=0, lwd = 3, col = "red")
+
+boxplot(datacombined$Measles_Diff ~ datacombined$GNI_over_8000,
+        xlab="",
+        ylab="Measles Difference in Percentage Points",
+        names = c("GNI Under 8000", "GNI Over 8000"),
+        main = "Change in Measles Vaccination Rate from 2016 to 2024 for
+        Countries Below or Above 8000 GNI")
+```
+
+*There does seem to be a difference between the two groups of countries. The median difference is slightly higher for the countries with GNI over 8000. The spread is much greater for the countries with GNI under 8000 compared to the countries with GNI over 8000.*
+
+(3.3) *(10 pts)* Create a 95% bootstrap confidence interval for the mean change in measles vaccination rates among countries with GNI \< 8000. Do the same for countries with a GNI \> 8000. You don't need to make any histograms of your bootstrap results, and you don't need to use the `t.test()` function. You also are not comparing the means of these two groups - you're getting separate intervals for each GNI group. Display the intervals and discuss what you observe.
+
+```{r}
+# To make grading easier, please leave the following line of code in your assignment
+set.seed(230)
+n_bootstrap <- 10000
+measles_bootstrap1 <- c()
+measles_bootstrap2 <- c()
+for (i in 1:n_bootstrap) {
+  measles_bootstrap1[i] <- mean(
+    sample(
+      datacombined$Measles_Diff[datacombined$GNI_over_8000 == "no"],
+      size=length(datacombined$Measles_Diff[datacombined$GNI_over_8000 == "no"]),
+      replace=TRUE))
+  measles_bootstrap2[i] <- mean(
+    sample(
+      datacombined$Measles_Diff[datacombined$GNI_over_8000 == "yes"],
+      size=length(datacombined$Measles_Diff[datacombined$GNI_over_8000 == "yes"]),
+      replace=TRUE))
+}
+quantile(measles_bootstrap1, c(0.025, 0.975))
+quantile(measles_bootstrap2, c(0.025, 0.975))
+```
+
+*The 95% confidence interval is lower for the countries with GNI under 8000, though the confidence intervals are large enough that there is overlap between the two confidence intervals.*
+
+(3.4) *(15 pts)* Using a permutation test, examine whether there a significant difference in the **MEDIAN** change in vaccination rates between high GNI countries and low GNI countries (calculate as high - low). Use a significance level of 0.01. Be sure to state (in words is fine) the null and alternative hypotheses, and discuss your conclusion. Be sure to include a histogram of results and add a vertical line that shows that observed difference in medians (see example in code from class).
+
+```{r}
+# To make grading easier, please leave the following line of code in your assignment
+set.seed(230)
+true_diff <- (median(datacombined$Measles_Diff
+                     [datacombined$GNI_over_8000 == "yes"])
+          - median(datacombined$Measles_Diff
+                   [datacombined$GNI_over_8000 == "no"]))
+true_diff
+n_perm <- 10000
+perm_diffs <- c()
+for (i in 1:n_perm) {
+  fakedata <- sample(datacombined$GNI_over_8000)
+  perm_diffs[i] <- (median(datacombined$Measles_Diff[fakedata == "yes"])
+                    - median(datacombined$Measles_Diff[fakedata == "no"]))
+}
+mean(abs(perm_diffs) >= abs(true_diff))
+hist(perm_diffs,
+     breaks=15,
+     xlab="Difference in Change in Rate (in Percentage Points)",
+     main="Permutated Sample Median Difference in Change in Measles
+     Vaccination Rate")
+abline(v = true_diff,
+       lwd=3,
+       col="red")
+```
+
+*The null hypothesis is that the difference in the median change in vaccination rate of Measles between high GNI countries and low GNI countries is 0. The alternative hypothesis is that this difference of medians is not 0. From the data we found that the difference of medians was 4, which has a significance level of 0.0016. Thus, we reject the null hypothesis as the data supports the claim that the difference in medians of change in vaccination rate between high GNI countries and low GNI countries is not 0.*

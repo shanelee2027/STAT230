@@ -1,0 +1,374 @@
+---
+title: "Homework 03 Data Cleaning, Normal Distributions"
+output:
+  pdf_document: 
+     fig_height: 5
+     fig_width : 7
+  word_document: 
+     fig_height: 5
+     fig_width : 7
+  html_document: default
+subtitle: Due by 11:59pm, Friday, 2.7.25
+author: S&DS 230/530/ENV 757
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+**(1) More on List Manipulation** *(18 points - 3 points each)*.
+
+(1.1) Make an object called `myList` that contains the following
+elements (in order):
+
+-   A matrix with the integers 1 through 36 that has six rows, filled by
+    row
+
+-   A list that contains
+
+    -   A vector with the text "Pianoforte" and "Gerbera Daisy"
+    -   A vector with the integers 9 through 13
+
+-   The integers 1 through 10
+
+You should be able to make this object in a single line of code.
+
+*Use `[]`, `[[]]`, `[,]` notation to answer parts b) through f).*
+
+(1.2) Make an object called `ans1` that is the third row of the matrix
+contained in `myList`.
+
+(1.3) Make an object called `ans2` that is the sum of the 6th column of
+the matrix contained in `myList`.
+
+(1.4) Make an object called `ans3` that is the sum of EACH column of the
+matrix contained in `myList` *(use the `apply()` function or check out
+`colSums()`)*.
+
+(1.5) Make an object called `ans4` that is the single element of
+`myList` that you can play.
+
+(1.6) Make an object called `ans5` that is the third element of the
+second element of the second element of `myList` converted to
+characters.
+
+Get the results of each of your objects you created above (i.e. get them
+to show up in your knitted file by typing their names or putting the
+code line that creates each object in parentheses).
+
+```{r}
+myList <- list(matrix(1:36, nrow = 6, ncol = 6, byrow=TRUE), 
+               list(c("Pianoforte", "Gerbera Daisy"), c(9:13)), 
+               1:10)
+myList
+ans1 <- myList[[1]][3, ]
+ans1
+ans2 <- sum(myList[[1]][, 6])
+ans2
+ans3 <- apply(myList[[1]], 2, sum)
+ans3
+ans4 <- myList[[2]][[1]][1]
+ans4
+ans5 <- as.character(myList[[2]][[2]][3])
+ans5
+```
+
+**(2) Normal Quantile Plots and the Binomial Distribution** *(20 points,
+3 points each, part (2.5) is 5 points)*.
+
+You may recall from your Intro Statistics course that a binomial
+distribution looks like a normal distribution if np \> 10 and n(1-p) \>
+10 (i.e. as long as the average number of successes and failures are
+both larger than 10). Recall that n is the number of trials, and p is
+the probability of success for each Bernoulli trial. *As an example,
+flip a coin 30 times, count the number of heads. n=30, p=.5, np = 15 \>
+10 and n(1-p) = 15 \> 10, so the distribution should be approximately
+normal)*.
+
+You are going to make six normal quantile plots that simulate 127 random
+observations from binomial distributions with p = 0.3 and various values
+of n.
+
+(2.1) Install the `car` package. This will allow you use the `qqPlot()`
+function. Load this package.
+
+(2.2) Make a vector called `vec` that is powers of 10 for powers 0
+through 5. The one caveat is that you need to use the`**` operator which
+reads as 'to the power of' *(i.e. `2**3` is 8).* Show what is contained
+in `vec`.
+
+(2.3) Use the `par()` function to set up your plot region to show 6
+plots on a page. Go learn about the `mfrow` option in par to create a
+plot that was two rows and three columns.
+
+(2.4) Use the `rbinom()` function to generate 6 random binomial
+observations, each with 17 trials, and with p=0.6. You may need to type
+`?rbinom` to get the syntax for this function. Store the result in an
+object called `vec2` and show what is contained in `vec2`.
+
+(2.5) Write a loop that repeatedly creates a normal quantile plot for
+127 random samples each from a binomial distribution with p = 0.3 and n
+equal to the 6 values stored in `vec`. A few plot details: \* Use the
+`qqPlot` function. \* Make the graph points red solid dots (`pch = 19`).
+\* Make the boundary lines blue (use `col.lines`) \* Make a main graph
+title that pastes the text "127 Binomial Samples, N =" to the
+corresponding value from `vec`.
+
+```{r}
+library("car")
+vec <- 10**(0:5)
+vec
+par(mfrow=c(2, 3))
+vec2 <- rbinom(6, 17, 0.6)
+vec2
+for (i in 1:6) {
+  qqPlot(rbinom(127, vec[i], 0.3), 
+         distribution = "norm",
+         pch=19,
+         col='red',
+         col.lines='blue',
+         main=paste("127 Binomial Samples, N =", vec[i]),
+         ylab="Number of Successes")
+}
+```
+
+(2.6) Take a look at the normal quantile plots. For what value of n do
+the graphs seem to be approximately normally distributed? Is this
+consistent with what you expect? Write two complete sentences to answer
+these questions.
+
+*The graphs seem approximately normally distributed for N \>= 100 since
+for those N do the samples seem to have a linear relationship with the
+theoretical values of a normal distribution. This is consistent with
+what I would expect since for p=0.3, np and n(1-p) are greater than 10
+only when n is greater than 34.*
+
+**(3) Favorite food and Data Cleaning** *(62 points. Parts 3.2 through
+3.5, 2 pts each, other values listed below)*.
+
+This is data generated by former students. I simply asked "What is your
+favorite food?". You can get the data
+[HERE](http://reuningscherer.net/S&DS230/data/food_230.csv).
+
+Your goal is similar to what we did with the question "What animal would
+you like to be?" in Class 5: clean this variable, make a barplot, and
+discuss the results.
+
+(3.1) *(1 pt)* Read in the data to a new object called `food`.
+
+(3.2) Get a sense of the dataset - dimensions, variable names, look at
+the first few rows.
+
+(3.3) Convert `food` to a single vector that is just the first column
+(literally, replace `food` with `food$Food`). if you need to, convert
+this value to character.
+
+(3.4) Show the sorted unique values of `food`. Calculate how many unique
+values exist in `food`.
+
+```{r}
+food <- read.csv("http://reuningscherer.net/S&DS230/data/food_230.csv")
+head(food, 10)
+food <- as.character(food$Food)
+sort(unique(food))
+length(unique(food))
+```
+
+
+(3.5) Write a couple of sentences about what data cleaning issues you
+notice amoung the unique values of `food`.
+
+*The capitalization isn't consistent, for example, "thai food" and "Thai food" are counted as unique values. There is also inconsistent spacing and punctuation. Some answers are too specific and thus count as their own value, such as "noodles with broth" as opposed to just "noodles". Some people prefaced their answer with "I love" or something similar.*
+
+(3.6) Cleaning Part I *(8 pts)*: Clean the data using the following
+steps (in order):
+
+-   Convert data to lower case
+-   Find " or " and remove this and anything that follows.
+-   Find " and " and remove this and anything that follows.
+-   Find " food" and remove this AND anything that follows.
+-   Find " cuisine" and remove this AND anything that follows.
+-   Remove all special characters and punctuation - see class 6.
+-   Remove trailing spaces at the end of text
+
+At each step, you'll probably want to check what unique values of `food`
+are left to make sure your functions are working correctly. By the time
+you finish, you should have 156 unique levels.
+
+Your final two lines of code should again show the sorted unique values
+of food and the current number of unique values.
+
+```{r}
+food <- tolower(food)
+food <- sort(food)
+food <- gsub(" or.*", "", food)
+food <- gsub(" and.*", "", food)
+food <- gsub(" food.*", "", food)
+food <- gsub(" cuisine.*", "", food)
+food <- gsub("[^0-9A-Za-z///' ]", "" , food)
+food <- gsub(" $", "" , food)
+sort(unique(food))
+length(unique(food))
+```
+
+
+(3.7) Cleaning Part II *(10 pts)*: A few quick random cleaning items:
+
+Clean up the following types of food (in order) - one line of code per
+type of food. In each case, deal with misspellings, modifiers ("shrimp
+curry" vs just "curry"), two words ('hot pot' instead of 'hotpot'),
+plurals, etc.
+
+-   hotpot
+-   curry
+-   lasagna
+-   noodles
+-   cookies
+-   chocolate
+-   cheese
+-   steak
+-   sushi
+-   fries (french, cajun, five guys' should all be 'fries')
+-   ramen
+-   tofu
+-   burgers (of any kind)
+-   soup
+-   anything containing 'delicious' just call 'delicious'
+
+When you're finished, you should have 130 unique values.
+
+Your final two lines of code should again show the sorted unique values
+of food and the current number of unique values.
+
+```{r}
+food <- gsub(".*hot\\s?pot.*", "hotpot", food)
+food <- gsub(".*curr.*", "curry", food)
+food <- gsub("lasagne", "lasagna", food)
+food <- gsub(".*noodle.*", "noodles", food)
+food <- gsub(".*cookies.*", "cookies", food)
+food <- gsub(".*chocolate.*", "chocolate", food)
+food <- gsub(".*cheese\\b", "cheese", food)
+food <- gsub(".*steak.*", "steak", food)
+food <- gsub(".*sushi.*", "sushi", food)
+food <- gsub(".*fries.*", "fries", food)
+food <- gsub(".*ramen.*", "ramen", food)
+food <- gsub(".*tofu.*", "tofu", food)
+food <- gsub(".*burgers.*", "burgers", food)
+food <- gsub(".*soup.*", "soup", food)
+food <- gsub(".*delicious.*", "delicious", food)
+sort(unique(food))
+length(unique(food))
+```
+
+
+(3.8) Cleaning Part III *(8 pts)*: Cleaning types of cuisine.
+
+Clean up the following types of cuisine (in order) - in this case,
+you'll want to make a vector called `searchvec` that contains the types
+of cuisine. Then create a loop following the example in Class 5 to
+replace all the modifiers for each cuisine type so that you ultimately
+end up with cleaned up versions of each cuisine type. Use not more than
+5 lines of code.
+
+The cuisine types (in order) are \* asian \* chinese \* vietnamese \*
+italian \* indian \* thai \* mexican \* brazilian \* korean
+
+(there are other types of cuisine, but they don't require cleaning).
+
+When you're finished, you should have 120 unique values.
+
+Your final two lines of code should again show the sorted unique values
+of food and the current number of unique values.
+
+```{r}
+searchvec <- c("asian", "chinese", "vietnamese", "italian", 
+               "indian", "thai", "mexican", "brazilian", "korean")
+for (i in 1:length(searchvec)) {
+  food <- gsub(paste0(".*", searchvec[i] ,".*"), searchvec[i], food)
+}
+sort(unique(food))
+length(unique(food))
+```
+
+
+(3.9) *(15 pts)* Following the example from Class 05, display a
+dataframe of the sorted tabular results of `food` to see how many
+individuals prefer each kind of food.
+
+From here on, the decisions of how to clean and combine categories are
+yours! Any food that currently has a count of 3 or more should remain
+(you can add to these categories - for example, you could add 'lasagna'
+to 'italian' or to 'pasta'). All other levels should be recoded or
+incorporated into a 'miscellaneous' food category. Points awarded based
+on thoughtfulness, effort, and quality/preciseness of your code.
+
+Include your code below, and add comments where appropriate to describe
+the choices you make. You should have no more than 40 levels by the time
+you finish.
+
+Display a dataframe of the sorted tabular results of `food` to see how
+many individuals prefer each kind of food AGAIN after you've finished
+your coding.
+
+```{r}
+food <- gsub(".*fish.*|salmon", "fish", food)
+food <- gsub(".*chicken.*", "chicken", food)
+food <- gsub(".*pizza.*", "pizza", food)
+food <- gsub(".*fried.*", "fried foods", food)
+food <- gsub(".*fruit.*|strawberries|bananas|.*mango.*|oranges|berries|nectarines", "fruit", food)
+food <- gsub(".*bread.*|.*cake.*|.*donut.*|.*bagel.*|.*baguette.*|.*cookies.*", "pastries", food)
+food <- gsub("burritos", "mexican", food)
+table1 <- data.frame(sort(table(food),decreasing=T))
+table1
+for (i in 38:90){ # misc
+  food <- gsub(paste0("^", as.character(table1[i, 1]), "$"), "other", food)
+}
+table1 <- data.frame(sort(table(food),decreasing=T))
+table1
+
+```
+
+
+(3.10) *(8 pts)* Final steps and a plot: You'll want to CAREFULLY follow
+the example in the code at the end of Class 05.
+
+-   Use the `toTitleCase()` function from the package `tools` to convert
+    food to title case.
+-   Make an object called `finaltab` that is a table of your final
+    vector `food`.
+-   Calculate percents, rounded to the nearest integer, for each food
+    type. Save this as an object called `percents`.
+-   Change the names of `finaltab` to include a space and then the
+    percents followed by a "%" in curved parentheses.
+-   Make a horizontal barplot of your final plot. Choose a nice bar
+    color, adjust the left margins as necessary, give a main title and
+    label the horizontal axis.
+
+```{r}
+library(tools)
+food <- toTitleCase(food)
+finaltab <- sort(table(food), decreasing=FALSE)
+par(mar = c(5, 9, 4, 2), cex = .6)
+percents <- round(finaltab/sum(finaltab)*100, 1)
+names(finaltab) <- paste0(names(finaltab)," (", percents, "%)")
+finaltab
+par(mar = c(10, 10, 5, 10), cex = 0.5)
+barplot(finaltab, 
+        horiz = T, 
+        las = 1, 
+        col = "blue", 
+        main = "Students' Favorite Foods",
+        xlab = "Count") 
+
+
+```
+
+
+(3.11) *(3 pts)* In no more than three sentences, discuss your process
+and results. Be sure to mention how many unique values of 'food' you
+started and ended with. Any surprises?
+
+*By coalescing together similar responses, we took 218 unique food values, and reduced them down to 38, including "other". It was surprising that people wrote essentially variations of the same type of food item. It was also a little surprising that people decided to put down the names of countries/cuisine rather than a specific food item. *
