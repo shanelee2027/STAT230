@@ -1,0 +1,336 @@
+---
+title: "Homework 09 Two Way ANOVA / ANCOVA / GLM"
+output:
+  pdf_document: default
+  html_document: default
+  word_document: default
+subtitle: Due by 11:59pm, Friday, April 18, 2025, 11:59pm
+author: S&DS 230/530/ENV 757
+---
+
+
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(car)
+```
+
+This assignment uses data from the International Social Survey Program on Environment from 2020 There are 224 questions from 21718 individuals across 14 countries.
+
+The data you'll need is [here](https://raw.githubusercontent.com/jreuning/sds230_data/refs/heads/main/iss_2020.csv). Be aware that it will take a few moments to load this data.
+
+You'll also want the [codebook that describes the variables](https://raw.githubusercontent.com/jreuning/sds230_data/refs/heads/main/ISS_2020_Codebook.pdf).  The final pages of the codebook have information on how to translate variable names to questions in the survey.
+
+
+**1)  Data Set creation** *(23 pts - 3 pts each section, except part 1.5 which is 5 pts)*
+
+1.1)  Read the data into an object called `envdat` (do NOT use the option `as.is = TRUE`).   Check the dimension to be sure the data loaded correctly.  Then create a new object called `envdat2` which only contains information for the following countries : Austria, Iceland, Japan, New Zealand, Philippines, Russia, and Thailand.   The variable that contains country is `country`.   You'll need to use the ISO 3166 Standard Book of Country Codes which you can find [HERE](https://en.wikipedia.org/wiki/ISO_3166-1_numeric#Officially_assigned_code_elements).
+
+Check the dimensions of your results - you should have 9476 observations.
+
+```{r}
+envdat <- read.csv("https://raw.githubusercontent.com/jreuning/sds230_data/refs/heads/main/ISS_2020.csv")
+dim(envdat)
+envdat2 <- envdat[envdat$country %in% c(40, 352, 392, 554, 608, 643, 764),]
+dim(envdat2)
+```
+
+
+1.2)  Create a new variable called `Country` on `envdat2` which has Country names rather than Country numbers.  There are several ways to do this, but I suggests you use the `recode()` function in the `car` package.  The syntax for this function is something like
+
+```{r, eval = FALSE}
+library(car)
+NewVar <- recode(envdat2$country, "1 = 'Transylvania'; 2 = 'Bezerkystan'; 
+                 3 = 'Isle Joyeuse'")
+```
+
+Once you're created the variable, make a table of the resulting variable to see how many observations there are from each country.
+
+```{r}
+envdat2["Country"] <- recode(envdat2$country, 
+                             "40 = 'Austria'; 
+                             352 = 'Iceland'; 
+                             392 = 'Japan'; 
+                             554 = 'New Zealand'; 
+                             608 = 'Phillipines'; 
+                             643 = 'Russia'; 
+                             764 = 'Thailand'")
+table(envdat2["Country"])
+```
+
+
+1.3)  Make a variable `Gender` on `envdat2` that contains gender  (which is variable `SEX`).  Recode so that 1 becomes 'Male' and 2 becomes 'Female'. Again, make a table of resulting variable to see how many people identify as Male and how many as Female.
+
+```{r}
+envdat2["Gender"] <- recode(envdat2$SEX,
+                            "1 = 'Male';
+                            2 = 'Female'")
+table(envdat2["Gender"])
+```
+
+
+1.4)  Create Variables `AgeYears` and `Educ` on `envdat2` from variables `AGE` and `EDUCYRS` which are age in years and years of education, respectively.  Get summary information and make a histogram for each variable to see if values seem reasonable.  
+
+Modify both variables so that any negative values are changed to `NA`. You'll also discover that some people have more than 30 years of eduction.   Assume this is an error and replace these values with NA.  Repeat your histograms to make sure your code works.
+
+```{r}
+envdat2$AgeYears <- envdat2$AGE
+envdat2$Educ <- envdat2$EDUCYRS
+summary(envdat2$AgeYears)
+hist(envdat2$AgeYears,
+     main = "Ages of Individuals",
+     xlab = "Age in Years")
+summary(envdat2$Educ)
+hist(envdat2$Educ,
+     main = "Education of Individuals",
+     xlab = "Education in Years")
+
+envdat2[envdat2$AgeYears < 0, "AgeYears"] <- NA
+envdat2[(envdat2$Educ < 0) | (envdat2$Educ > 30), "Educ"] <- NA
+summary(envdat2$AgeYears)
+hist(envdat2$AgeYears,
+     main = "Ages of Individuals",
+     xlab = "Age in Years")
+summary(envdat2$Educ)
+hist(envdat2$Educ,
+     main = "Education of Individuals",
+     xlab = "Education in Years")
+```
+
+
+1.5)  Make a variable `EmpStat` on `envdat2` from variable `MAINSTAT` that contains employment status information.  The codebook for this question is listed below:
+
+-9 = No answer
+-8 = Don't know
+1 = In paid work
+2 = Unemployed and looking for a job
+3 = In education
+4 = Apprentice or trainee
+5 = Permanently sick or disabled
+6 = Retired
+7 = Domestic work (meaning working in the home with family)
+8 = Incompulsory military service or community service
+9 = Other
+
+Code `EmpStat` in the following way : 1, 2, and 8 code as 'Working or Looking', 7 codes as 'At Home', 3 and 4 code as 'Student', 6 codes as 'Retired', -9 and -8 code as NA, and 5, 9 code as 'Other'.
+
+Make a table of your results - look up options for the `table()` function so that it also displays NA values.
+
+```{r}
+envdat2$EmpStat <- recode(envdat2$MAINSTAT, 
+                          "1 = 'Working or Looking'; 
+                          2 = 'Working or Looking'; 
+                          8 = 'Working or Looking'; 
+                          7 = 'At Home'; 
+                          3 = 'Student'; 
+                          4 = 'Student'; 
+                          6 = 'Retired';
+                          -9 = NA;
+                          -8 = NA;
+                          5 = 'Other';
+                          9 = 'Other'")
+table(envdat2$EmpStat, exclude = NULL)
+```
+
+
+1.6)  If you look in the codebook starting on page 10, you'll notice many questions are on a 5 point scale.  We're going to create a composite environmental index score from 12 of these questions.  The new variable should be called `EnvAtt` on `envdat2`.  It might be tempting to simply add scores together; however, for some questions 'Agree Strongly' (which is coded as 1) would indicate support the environment, while other questions 'Agree Strongly' indicates lack of support for the environment.  Furthermore, you want to combined variables so that a higher score indicates more support for the environment.
+
+
+The following questions should be included : V20, V21, V22, V23; V26, V27, V28, v29; V31, V32, V34, V36.  For each quesion, you'll either want to add it directly, OR you'll want to add (6 - question).   Using (6 - question) will convert 1's to 5's and 5's to 1's.  Remember, for your final composite variable, you want a HIGHER score to indicate GREATER support for the environment.  
+
+FIRST - you'll need to replace the values -9 and -8 in each of these questions (which stand for 'No Answer' and 'Can't Choose') with NA.  THEN you can proceed with making your composite variable.
+
+Your new varible should have a minimum of 12 and a maximum of 60.  Check this by getting summary information and by making a histogram of `EnvAtt`.   Also, make a normal quantile plot of `Envatt'.   You'll also want to determine how many missing values were created in the final index.
+
+The original variables were all on a 5 point scale and were certainly NOT normally distributed.   Does your new composite variable seem to be approximately normally distributed?
+
+```{r}
+normal_list <- c("v21", "v23", "v29", "v32", "v34")
+reverse_list <- c("v20", "v22", "v26", "v27", "v28", "v31", "v36")
+envdat2$EnvAtt <- 0
+for (i in 1:5) {
+  col <- normal_list[i]
+  envdat2[(envdat2[col] == -8) | (envdat2[col] == -9),][col] <- NA
+  envdat2$EnvAtt <- envdat2$EnvAtt + envdat2[[col]]
+}
+for (i in 1:7) {
+  col <- reverse_list[i]
+  envdat2[(envdat2[col] == -8) | (envdat2[col] == -9),][col] <- NA
+  envdat2$EnvAtt <- envdat2$EnvAtt + 6 - envdat2[[col]]
+}
+summary(envdat2$EnvAtt)
+hist(envdat2$EnvAtt,
+     main="Compiled Environment Support Scores",
+     xlab="Score")
+qqPlot(envdat2$EnvAtt)
+```
+
+
+*The composite variable does seem normally distributed. The histogram of the composite scores looks normally distributed, and the normal quantile plot shoes that the values are within the confidence interval.*
+
+1.7)  Finally, create a new dataframe called `envdat3` which contains only the new variables you've created in 1.2 through 1.6.  Remove any rows with missing values for any of these variables.  Get the dimension of `envdat3`.  Lastly, attach `envdat3`.
+
+```{r}
+envdat3 <- envdat2[,c("Country", "Gender", "AgeYears", "Educ", "EmpStat", "EnvAtt")]
+envdat3 <- na.omit(envdat3)
+dim(envdat3)
+attach(envdat3)
+```
+
+
+
+**2.  Plots and Interactions**  *(17 pts)*
+
+
+2.1)  Make boxplots of `EnvAtt` by Country, Employment Status, and Gender (that's 3 different boxplots).  Additionally, make scatterplots of `EnvAtt` by age and by years of education.  Is there evidence visually that our composite environmental index is related to any of these 5 variables (and elaborate)?
+
+```{r}
+par(cex.axis=0.6)
+boxplot(EnvAtt ~ Country)
+par(cex.axis=1)
+boxplot(EnvAtt ~ EmpStat)
+boxplot(EnvAtt ~ Gender)
+```
+
+
+*Visually, there seems to be no significant difference in the composite variable when comparing across these different groups since the boxplots show that the distributions more or less have the same median and variance. There is a perhaps a small difference between the Phillipines, Russia, and Thailand against the other 4 countries; the median for those 3 countries is smaller.*
+
+
+2.2).  Examine relationships between the three possible pairs of the variables Gender, Country, EmpStat as they relate to EnvAtt.  For each pair of categorical variables, make a table showing counts  (i.e. `table(Gender, Country)` for example).  This will allow you to see how many individuals exist for each combination of levels of your categorical variables.  THEN, make interaction plots for each pair of variables as they relate to `EnvAtt`.  Which pairs of categorical variables seem like they might have an interaction as they relate to `EnvAtt`?
+
+```{r}
+table(Country, EmpStat)
+table(Country, Gender)
+table(EmpStat, Gender)
+par(cex.axis=0.7)
+interaction.plot(EmpStat, Country, EnvAtt,
+                 lwd = 3, 
+                 col = c('red','blue','black'), 
+                 main = "Interaction Plot of Country and Employment Status")
+par(cex.axis=1)
+interaction.plot(Gender, Country, EnvAtt,
+                 lwd = 3, 
+                 col = c('red','blue','black'), 
+                 main = "Interaction Plot of Country and Gender")
+interaction.plot(Gender, EmpStat, EnvAtt,
+                 lwd = 3, 
+                 col = c('red','blue','black'), 
+                 main = "Interaction Plot of Employment Status and Gender")
+```
+
+
+*All pairs of categorical variables seem to have interactions with each other. In all three interaction plots the lines are not parallel. However, in the Country vs Employment Status interaction plot, Japan has the most notable interaction by far. The other countries maintain the same sign of slope between the different employment statuses, but Japan's slope sometimes deviates from the others. Also, in the Emplyment Status vs Gender interaction plot, the slope is either flat or negative, which suggests that the interaction is not very strong.*
+
+
+**3.  Fitting Two-Way ANOVA models**  *(20 pts, 10 pts each part)*
+
+3.1)  Fit three different two-way ANOVA models for `EnvAtt`, one for each pair of your three categorical variables (i.e. Country and EmpStat, Country and Gender, Gender and EmpStat).  Include an interaction term in each model.  Get summary information for each model using the `Anova()` function with option `type = 'III'`.  Which models appear to have significant interaction terms?  Does this seem to be consistent with what you observed in the interaction plots above?
+
+```{r}
+Anova(aov(EnvAtt ~ Country + EmpStat + Country*EmpStat), type = 'III')
+Anova(aov(EnvAtt ~ Country + Gender + Country*Gender), type = 'III')
+Anova(aov(EnvAtt ~ Gender + EmpStat + Gender*EmpStat), type = 'III')
+```
+
+
+*The Country vs EmpStat and Country vs Gender models seem to have significant interaction terms, with p values less than 0.001. The EmpStat vs Gender model does not, with a p value of 0288. This is consistent with what I observed; while all three interaction plots showed different slopes among the categorical variables, the slopes in the EmpStat vs Gender plot were still moved in the same general direction.*
+
+
+3.2)  For the model with Country and Gender you fit in part (3.1), make residual plots.  Are the model assumptions reasonably met (write a sentence supporting your answer)?
+
+```{r}
+library(leaps)
+myResPlots <- function(model, label){
+  
+  #Normal quantile plot of studentized residuals
+  qqPlot(rstudent(model), pch = 19, 
+         main = paste("NQ Plot of Studentized Residuals,", label))
+  
+  #plot of fitted vs. studentized residuals
+  plot(rstudent(model) ~ model$fitted.values, pch = 19, col = 'red', 
+       xlab = "Fitted Values", 
+       ylab = "Studentized Residuals",
+     main = paste("Fits vs. Studentized Residuals,", label))
+  abline(h = 0, lwd = 3)
+  abline(h = c(2,-2), lty = 2, lwd = 2, col="blue")
+  abline(h = c(3,-3), lty = 2, lwd = 2, col="green")
+
+}
+myResPlots(aov(EnvAtt ~ Country + Gender + Country*Gender), 
+           label = "Composite Environment Score")
+```
+
+
+*The model assumptions are reasonably met since the composite scores are approximately normally distributed and the residuals follow a uniform distribution.*
+
+
+**4.  ANCOVA**  *(20 pts, 10 pts each part)*
+
+4.1)  Fit an ANCOVA model predicting `EnvAtt` based on Gender, Education, and the interaction of Gender and Education.  Get ANOVA summary information for this model (again, use the `Anova()` function with option `type = 'III'`).  Is there a significant interaction between Gender and Education?  Also get linear model summary information for this model.  For which gender is there a greater increase in Environmental Index Score as Education increases? 
+
+```{r}
+m1 <- lm(EnvAtt ~ Gender*Educ)
+Anova(m1, type = "III")
+summary(m1)
+```
+
+
+*There does seem to be a significant interaction between Gender and Education, with a p value of less than 0.001. Since the slope of GenderMale:Educ is negative, this means that for Female there is a greater increase in Environmental Index Score as Eduation increases compared to Male.*
+
+4.2)  Make a plot that shows `EnvAtt` as predicted by years of education with separate colors for each gender.  Then, superimpose the two predicted regression lines (one for each gender).  The plot should be consistent with your results from part a).  You'll want to look carefully at similar code in Class 19.
+
+```{r}
+plot(EnvAtt ~ Educ, 
+     col = factor(Gender), 
+     pch = 16, 
+     cex = .5,
+     main="Composite Score by Gender and Education Level",
+     xlab="Years of Education")
+legend("topleft", col = 1:2, legend = levels(factor(Gender)), pch = 16)
+coefs <- coef(m1)
+coefs
+abline(a = coefs[1], b = coefs[3], col = "black", lwd = 3)
+abline(a = coefs[1] + coefs[2], b = coefs[3] + coefs[4], col = 2, lwd = 3)
+```
+
+
+
+**5.  GLM** *(20 pts, 10 pts each part)*
+
+5.1).  Fit a model for `EnvAtt` that includes ALL of the five possible continous and categorical predictors.  Also include two-way interactions between Gender and Education, Employment Status and Country, Gender and Country, Employment Status and Gender, Age and Gender.  Save to an object called `m1`.
+
+Get ANOVA summary information for this model (again, use `Anova()` with option `type = 'III'`).
+
+THEN, perform manual backwards stepwise regression, removing non-significant terms until all terms have p-values less than 0.05.  REMEMBER, you want to remove interactions BEFORE you remove any main effects.  You don't need to show every step - just put your final model into an object called `m2`.  Get linear model summary information for this model.  Finally, check residuals for your final model.
+
+```{r}
+m1 <- lm(EnvAtt ~ Gender*Educ + 
+           EmpStat*Country + 
+           Gender*Country + 
+           EmpStat*Gender + 
+           AgeYears*Gender)
+Anova(m1, type = "III")
+
+m1 <- lm(EnvAtt ~ Gender*Educ + 
+           EmpStat*Country + 
+           Gender*Country + 
+           AgeYears)
+Anova(m1, type = "III")
+
+m2 <- lm(EnvAtt ~ Gender*Educ + 
+           EmpStat*Country + 
+           Gender*Country)
+Anova(m2, type = "III")
+summary(m2)
+myResPlots(m2, label = "Composite Environment Score")
+```
+
+
+
+5.2).  Write a few sentences describing the overall fit of your final model, the direction of coefficients for each continuous predictor, some discussion of categorical predictors, and the nature of any resulting interactions.
+
+*The final model doesn't seem to be that good considering that the adjusted R squared is 0.1177. Years of education is the only continuous predictor; this predictor had a positive slope which suggests that the more educated an individual is, the more likely that they are to support the protection of the environment. The most pro-environment country seems to be Iceland, whereas the least are the Phillipines, Russia, and Thailand. Students and women are more likely to be pro-environment. Only a few of the interactions seem to be statistically significant; those being between employment status and being from Iceland, and being male and being from the Pillipines or Russia.*
+
+THE END
+
+

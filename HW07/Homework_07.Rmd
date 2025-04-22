@@ -1,0 +1,294 @@
+---
+title: "Homework 07 Multiple Linear Regression"
+output:
+  pdf_document: default
+  html_document: default
+  word_document: default
+subtitle: Due by 11:59pm, Saturday, March 29, 2025
+author: S&DS 230/530/ENV 757
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+**1) Model Overfitting and R-squared** *(20 pts)*
+
+In class, I discussed how, despite its merits, R-squared is not useful as the sole measure of predictive accuracy. The problem is that as more predictors are added (even useless ones), R-squared will always increase (assuming there is no missing data).
+
+This problem is magnified in the case of **Model Overfitting**. We say that a model is over-fit if the number of predictors approaches the number of observations. When the number of predictors is one less than the number of observations, the R-squared will always be 1.
+
+We do a simulation to see this in action.
+
+First, I'll simulate all of my variables (predictors and response) from a normal(0, 1) distribution. That is, the y values and ALL of the possible X predictor values are all randomly chosen from a random normal distribution with mean zero and sd = 1. This means that the x variables are uncorrelated AND they are all NOT significant predictors of Y.
+
+```{r}
+set.seed(1)
+simdata <- rnorm(10 * 15) # need 10 * 15 values simulated
+simdata <- matrix(simdata, nrow = 10, ncol = 15) # now convert this vector into a matrix
+colnames(simdata) <- c("y", paste0("x", 1:14)) # add column names
+simdata <- as.data.frame(simdata) # convert the matrix into a data frame
+```
+
+Let's pretend that this is an actual dataset we'd like to use for linear regression, 10 observations (rows) of 14 predictors and a response variable. The columns are named as follows (so we treat the first column "y" as our response variable and the subsequent columns "x1", "x2", ... as our predictors):
+
+```{r}
+colnames(simdata)
+```
+
+**Note**: By virtue of how we simulated the data (independently and identically sampled from a standard normal distribution), "y" has no relationship with any of the 14 possible predictors.
+
+1.1) *(5 pts)* Fit a simple linear regression model predicting `y` using `x1` and save the results to an object called `mod1`. Does it appear that `x1` is a significant predictor of `y`? What is the value of R-squared (use `summary(mod1)$r.squared`)? Interpret its value in the context of the model.
+
+```{r}
+mod1 <- lm(y ~ x1, data = simdata)
+mod1
+summary(mod1)$r.squared
+```
+
+*Since the r squared value is 0.142, it appears that x1 is not a significant predictor of y. 14.2% of the variation in y can be explained by the variation in x1.*
+
+1.2) *(8 pts)* Using a for-loop, now expand your linear regression model in (a) by iteratively adding in one more predictor at a time. That is to say, the first iteration of your for-loop should use `x1` as a predictor; the second iteration of your for-loop should use `x1`, and `x2`; and so on, until all 14 predictors are used in your model. Store the values of R-squared in a vector called `rsqvals` of length 14, so that the `rsqvals[i]` should contain the value of R-squared for a model using predictors `x1` through `xi`. Finally, display the values in `rsqvals`.
+
+*Hint:* remember the shorthand formula to include all predictors: `y ~ .`. So, for example, if I wanted to fit a model using `x1` through `x7` as predictors, I could do:
+
+```{r}
+simtemp <- simdata[,1:8]
+m7 <- lm(y ~ ., data = simtemp)
+```
+
+```{r}
+rsqvals <- c()
+for (x in 1:14) {
+  simtemp <- simdata[,1:(x+1)]
+  # print(simtemp)
+  tempmodel <- lm(y ~ ., simtemp)
+  rsqvals[x] = summary(tempmodel)$r.squared
+}
+rsqvals
+```
+
+1.3 *(7 pts)* How many predictors did it take to reach an R-squared of 1 (write a line of code to get this value)? Display a plot that shows the increase in R-squared with an increasing number of predictors. Be sure to label your plot.
+
+```{r}
+match(1, rsqvals)
+plot(rsqvals,
+     main="R-squared Values with Varying Predictors",
+     xlab="Number of Predictors",
+     ylab="R-squared Value",
+     col='red')
+```
+
+*It took 9 predictors, which makes sense since with 9 slopes and 1 intercept we have 10 variables, and a linear system of 10 variables and 10 linearly independent equations always has a unique solution.*
+
+**2) Ohio Crime Data** *(80 points)*
+
+A 1999 survey sponsored by the US Justice Department and the University of Cincinnatti interviewed a number of Ohio residents on their attitudes toward crime, criminals, and ways of reducing crime. In addition, various religious and demographic information was collected.
+
+A summary of survey questions (and label information) can be found [HERE](https://github.com/jreuning/sds230_data/blob/main/OhioCrime.pdf). You'll want to look at pages 17 - 34 at a minimum. Each question is labeled V1, V2, etc. through V98. We'll be looking at a subset of these questions.
+
+The data itself is [HERE](https://raw.githubusercontent.com/jreuning/sds230_data/refs/heads/main/ohiocrime.csv).
+
+2.1) *(2 pts)* Read the data into an object called `crime`. Get the dimension and column names of `crime`. You won't need the `as.is = TRUE` option.
+
+```{r}
+crime <- read.csv('https://raw.githubusercontent.com/jreuning/sds230_data/refs/heads/main/ohiocrime.csv')
+dim(crime)
+names(crime)
+head(crime)
+```
+
+2.2) *(10 pts)* First consider the variables in columns 10 through 23; these are 14 questions having to do with attitudes toward preventing crime (see PDF file). Each question is on a 6 point scale (see PDF file for particular levels). Your first task is to visually examine the correlations with the `corrplot.mixed` function discussed in class 11.
+
+I've given an outline chunk below. Your job is to fill in the details as indicated. Be sure to remove `eval = F` before knitting.
+
+```{r fig.height = 5, fig.width = 5}
+
+#note the options above are to make plots work properly in the corrplot package.
+
+#Load the corrplot package
+library(corrplot)
+
+#calculate pairwise correlations for columns 10-23 of crime.  You'll need the   use = "pairwise.complete.obs" option.
+cor1 <- cor(crime[10:23], use="pairwise.complete.obs", method="pearson") 
+
+#round cor1 to 2 decimal places and display the result.
+cor1 <- round(cor1, digits=2)
+cor1
+  
+#finds the exact cell of cor1 which contains the maximum positive pairwise
+# correlation (other than 1), and stores that cell in maxloc
+maxloc <- which(cor1 == max(cor1[cor1<1]), arr.ind = TRUE)
+
+#prints the names of the columns of maxloc, which would be the two columns
+# with the maximum positive pairwise correlation
+names(crime[10:23])[maxloc[1,]]
+
+#Create an object called sigcorr that has the results of cor.mtest for columns 10-23 of the crime data.  Use 95% CI.
+sigcorr <- cor.mtest(crime[10:23], conf.level = 0.95)
+
+#Use corrplot.mixed to display confidence ellipses, pairwise correlation values, and put on 'X' over non-significant values.
+corrplot.mixed(cor1, lower.col="black", upper = "ellipse", tl.col = "black", number.cex=.7, 
+                tl.pos = "lt", tl.cex=.7, p.mat = sigcorr$p, sig.level = .05)
+```
+
+2.3) *(5 pts)* Comment on the overall level of correlations among the considered questions. Which pair of questions had the highest sample correlation? Are you surprised? (include comments on the actual questions in your answer)
+
+*Questions 10 and 19 had the highest pairwise sample correlation; question 10 was about state-provided jobs to low-income inner-city youths, and question 19 was similar, asking about state-provided apprenticeship programs for youths in general. I'm not surprised that these two questions had a high correlation given that they ask very similar questions, the difference being that question 10 is about giving jobs directly rather than apprenticeship programs, and that question 10 specifies low-income inner-city youths.*
+
+2.4) *(5 pts)* Make a scatterplot of values for the two questions that had the highest pairwise correlation. Make sure your plot has labels for each axis (and not 'V10' - something with meaning). Include two top titles - one for the plot as a whole, one which reports the sample correlation to two decimal places. How helpful is this plot?
+
+```{r}
+plot(x=crime$V10,
+     y=crime$V19,
+     col="red",
+     main="Comparison Between Support for Two Prompts",
+     xlab="Support for State-Provided Jobs to Low-Income Inner-City Youths",
+     ylab="Support for State-run Youth Apprenticeship Programs",
+     pch=19)
+```
+
+*This plot is not helpful since there are a discrete number of possible response pairs, and there are multiple counts for each possible response pair which cannot be shown since the points cover each other.*
+
+2.5) *(4 pts)* Repeat part 2.4) but jitter results in both directions. Write a sentence about what you observe.
+
+```{r}
+plot(x=jitter(crime$V10, factor=1),
+     y=jitter(crime$V19, factor=1),
+     col="red",
+     main="Comparison Between Support for Two Prompts",
+     xlab="Support for State-Provided Jobs to Low-Income Inner-City Youths",
+     ylab="Support for State-run Youth Apprenticeship Programs",
+     pch=19)
+```
+
+*There appears to be a positive correlation, in that there are a lot of points for when the support for the two questions are similar.*
+
+We are now going to proceed with performing stepwise regression. In particular, we're going to fit a model that looks at possible predictors of question V45 (you'll want to look up what this question is). To do this, I'm making a new dataset called `crime2` which contains the relevant columns (notice I'm putting the response variable FIRST). Be sure to remove the option `eval = F`.
+
+```{r}
+crime2 <- crime[, c(45, 10:23, 65, 70, 72, 87, 86)]
+names(crime2)
+dim(crime2)
+```
+
+2.6) *(4 pts)* Perform best subsets regression using the `regsubsets` function in the `leaps` package. Save the results in an object called `mod2`. Get the summary of `mod2` and save the results in an object called `mod2sum`. Display `mod2sum$which` to get a sense of which variables are included at each step of best subsets.
+
+```{r}
+library(leaps)
+mod2 <- regsubsets(V45 ~ ., data = crime2, nvmax = 19)
+mod2sum <- summary(mod2)
+mod2sum$which
+```
+
+2.7) *(8 pts)* Following the example in classes 13-16, examine the best model according to highest r-squared. Here are your steps:
+
+-   Make an object called `modnum` which contains the row number in `mod2sum$which` for the model with the highest r-squared.
+-   Print the variable names for predictors that ended up in this model.
+-   Make a temporary dataset called `crimetemp` which has the columns of `crime2` that were included in this model.
+-   Fit the model and return summary information for the model.
+
+```{r}
+modnum <- which.max(mod2sum$rsq)
+modnum
+names(crime2)[mod2sum$which[modnum, ]][-1]
+crimetemp <- crime2[ ,mod2sum$which[modnum, ]]
+summary(lm(V45 ~ ., data = crimetemp))
+```
+
+2.8) *(4 pts)* Repeat 2.7) for adjusted R-squared.
+
+```{r}
+modnum <- which.max(mod2sum$adjr2)
+modnum
+names(crime2)[mod2sum$which[modnum, ]][-1]
+crimetemp <- crime2[ ,mod2sum$which[modnum, ]]
+summary(lm(V45 ~ ., data = crimetemp))
+```
+
+2.9) *(4 pts)* Repeat 2.7) for BIC.
+
+```{r}
+modnum <- which.min(mod2sum$bic)
+modnum
+names(crime2)[mod2sum$which[modnum, ]][-1]
+crimetemp <- crime2[ ,mod2sum$which[modnum, ]]
+summary(lm(V45 ~ ., data = crimetemp))
+```
+
+2.10) *(4 pts)* Repeat 2.7) for the Cp Statistic.
+
+```{r}
+modnum <- min(c(1:length(mod2sum$cp))[mod2sum$cp <= c(1:length(mod2sum$cp)) + 1])
+modnum
+names(crime2)[mod2sum$which[modnum, ]][-1]
+crimetemp <- crime2[ ,mod2sum$which[modnum, ]]
+summary(lm(V45 ~ ., data = crimetemp))
+```
+
+2.11) *(6 pts)* We choose as our final model the model indicated by BIC. Go refit this model and save the results in an object called `modfin`. How many observations had missing values in this model vs. the number of observations with missing values in the model with all predictors?
+
+```{r}
+modnum <- which.min(mod2sum$bic)
+modnum
+names(crime2)[mod2sum$which[modnum, ]][-1]
+crimetemp <- crime2[ ,mod2sum$which[modnum, ]]
+modfin <- lm(V45 ~ ., data = crimetemp)
+summary(modfin)
+summary(modfin)$r.squared
+```
+
+*The final model had 24 observations removed due to missing values, as opposed to 74 for the model that contained all variables.*
+
+2.12) *(6 pts)* Make two residual plots - studentized residuals vs fitted values (with boundaries at +/-2 and +/-3) as well a normal quantile plot of the residuals. Write a few sentences about how the plots do/do not indicate that we've met the assumptions of our regression model. Note : the six-toed beast that seems to have slashed the plot of fits vs. residuals is exactly what we would expect. Why is this?
+
+```{r}
+library(car)
+myResPlots <- function(model, label){
+  
+  #Normal quantile plot of studentized residuals
+  qqPlot(rstudent(model), pch = 19, main = paste("NQ Plot of Studentized Residuals", label))
+  
+  #plot of fitted vs. studentized residuals
+  plot(rstudent(model) ~ model$fitted.values, pch = 19, col = 'red', xlab = "Fitted Values", ylab = "Studentized Residuals",
+     main = paste("Fits vs. Studentized Residuals", label))
+  abline(h = 0, lwd = 3)
+  abline(h = c(2,-2), lty = 2, lwd = 2, col="blue")
+  abline(h = c(3,-3), lty = 2, lwd = 2, col="green")
+
+}
+
+myResPlots(modfin, label = "")
+```
+
+*Looking at the normal quantile plot, the residuals do seem to lie within the confidence interval at least for the values closer to the center, which suggests that the residuals do follow a normal distribution. Then, looking at the studentized residuals vs fitted values, for the most part there doesn't seem to be a significant difference in the residuals between the different possible fitted values, which is good. The reason that the plot looks like 6 straight lines is because for any fitted value, there are only 6 possible residuals due to question 45 only having 6 possible responses. And as the fitted value increases, the residuals decrease by that same amount.*
+
+2.13) *(5 pts)* Run the code below. Describe what this does in not more than two sentences.
+
+```{r}
+
+CIs <- confint(modfin)
+coefs <- coef(modfin)
+library(plotrix)
+plotCI(1:(length(coefs)-1), coefs[-1], 
+       ui = CIs[-1,2], li = CIs[-1,1], 
+       xlab = "", 
+       ylab = "Coefficient (and 95% CI)", 
+       main = "Final Crime Model Coefficients and CI's", 
+       axes = FALSE, lwd = 2, col = "blue")
+abline(h = 0, lty = 2, lwd = 3, col = "red")
+axis(side = 2)
+axis(side = 1, at = 1:(length(coefs)-1), label = names(coefs)[-1], las = 2)
+
+```
+
+*The code calculates and displays the 95% confidence intervals of the correlation coefficients for each of the 5 variables included in the final model.*
+
+2.14) *(13 pts)* FINALLY - write a short paragraph discussing your model results.
+
+-   Comment on R-squared
+-   Comment on direction and interpretation of each of the predictors included in the final model. Are you surprised in any instance?
+
+*The R-squared value was 0.226, which suggests that 0.226 of the variation in the responses to question 45 is explained by the variation in the responses to the questions of the predictors included in the final model. Questions 10 and 72 were negative predictors for question 45, whereas questions 17, 20, and 22 were positive predictors. The correlation for question 72 is a little surprising; it suggests that those who are more educated are less likely to think vindictively towards criminals - I thought it'd be the other way around since those who are more educated are less likely to commit (violent) crime. The results for questions 17, 20, and 22 are not surprising at all since they all are directly related to harsher punishments for criminals.*
+
+THE END
