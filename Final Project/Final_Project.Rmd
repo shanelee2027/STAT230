@@ -1,0 +1,356 @@
+---
+title: "U.S. Salary Disaparities Across Various Demographics and Industries"
+output:
+  pdf_document: default
+  html_document: default
+  word_document: default
+subtitle: S&DS 230 Final Project
+author: Shane Lee
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(car)
+library(dplyr)
+options(scipen = 999)
+set.seed(42)
+```
+
+## 1) Problem Context
+
+It is well known that salaries vary significantly across individuals, often influenced by demographic factors such as gender, race, and age. While one might envision a future in which compensation is determined solely by internal attributes—such as interpersonal skills or domain-specific expertise—that ideal remains distant. In the present, demographic characteristics continue to play a meaningful role in shaping earnings. This paper investigates how wages differ across gender, age, and occupational industry, with the aim of quantifying these disparities and understanding the extent to which they persist.
+
+## 2) Data Background
+
+The [American Community Survey (ACS) Public Use Microdata Sample (PUMS)](https://www.census.gov/programs-surveys/acs/microdata/access.html) is a nationally representative dataset that provides detailed information on individuals and housing units, with data available at the state level. It includes a wide range of demographic variables, particularly those related to employment. These include annual wage income, class of worker (e.g. private sector, government, self-employed), average hours worked per week, and more. The following is a list of the variables used in this analysis:
+
+-   WAGP - Wages/salary (continuous)
+-   OCCP - Occupation (categorical)
+-   COW - Class of worker (categorical)
+-   ESR - Employment Status (categorical)
+-   WKHP - Hours worked per week (continuous)
+-   AGEP - Age (continuous)
+-   SEX - Sex (categorical)
+
+The exact details of these variables can be found in the [2023 ACS PUMS Data Dictionary](https://www2.census.gov/programs-surveys/acs/tech_docs/pums/data_dict/PUMS_Data_Dictionary_2023.pdf). For this paper, we take the data for individuals living in Massachusetts.
+
+## 3) Data Cleaning
+
+There are two initial issues with using every entry in the dataset as-is.
+
+The first is that not all individuals are employed full-time. To address this, the dataset is filtered based on several variables. For the COW variable, only individuals employed in the private sector or government are retained; those who are self-employed or unemployed are excluded. For the ESR variable, individuals who are unemployed or in the armed forces are also removed. Finally, using the WKHP variable, only those who report working an average of 30 hours per week or more are kept.
+
+The second issue is the presence of outliers in reported wages. Some individuals in the dataset are marked as working full-time but earning less than \$20,000 annually—below what would be expected under Massachusetts minimum wage laws. Assuming these cases reflect reporting discrepancies or data quality issues, they are excluded from the analysis. Additionally, the dataset applies top-coding to wage values: individuals earning more than \$715,000 are all recorded as earning exactly \$715,000 to protect their anonymity. Because their true incomes are unknown, these entries are also excluded from the final dataset.
+
+The OCCP variable includes hundreds of unique codes, each corresponding to a specific occupation, such as "Photographer" or "Retail Salesperson." These occupations can be grouped into broader industry categories—referred to in this paper as occupation types—such as "Engineering" or "Healthcare." The full list of occupational codes and their associated categories is available on the [ACS Occupation Codes](https://usa.ipums.org/usa/volii/c2ssoccup.shtml) website.
+
+While all occupation types are included in the original dataset, this analysis focuses on a selected subset to maintain clarity and statistical power. The following occupation types are used in this paper, with representative examples in parentheses:
+
+-   Computer and Mathematical (e.g. Software Engineer)
+-   Education (e.g. Teacher)
+-   Finance (e.g. Financial Analyst)
+-   Healthcare (e.g. Dentist)
+-   Legal (e.g. Paralegal)
+-   Management (e.g. Human Resources Manager)
+-   Science (e.g. Astronomer)
+
+```{r, include = FALSE}
+df <- read.csv("psam_p25.csv", stringsAsFactors = FALSE)
+
+# Only employees of companies or the government, filter out self-employed
+#  or unemployed individuals
+df <- df[df$COW %in% c(1, 2, 3, 4, 5),]
+
+# Filter out unemployed or those in armed forces
+df <- df[df$ESR %in% c(1, 2),]
+
+# Only full-time employees who work 30+ hours a week
+df <- df[df$WKHP >= 30,]
+
+# Only those earning ~minimum wage or more
+df <- df[df$WAGP >= 20000,]
+
+# Filter out top-coded individuals
+df <- df[df$WAGP < 715000,]
+
+
+# Creates a new column "OccupationType" based on the column "OCCP"
+df <- df %>%
+  mutate(OccupationType = case_when(
+    OCCP >= 0010 & OCCP <= 0440 ~ "Management",
+    OCCP >= 0500 & OCCP <= 0750 ~ "Business Operations",
+    OCCP >= 0800 & OCCP <= 0960 ~ "Finance",
+    OCCP >= 1000 & OCCP <= 1240 ~ "Computer and Mathematical",
+    OCCP >= 1300 & OCCP <= 1560 ~ "Engineering",
+    OCCP >= 1600 & OCCP <= 1980 ~ "Science",
+    OCCP >= 2000 & OCCP <= 2060 ~ "Community Services",
+    OCCP >= 2100 & OCCP <= 2180 ~ "Legal",
+    OCCP >= 2200 & OCCP <= 2555 ~ "Education",
+    OCCP >= 2600 & OCCP <= 2920 ~ "Arts, Media, Entertainment",
+    OCCP >= 3000 & OCCP <= 3550 ~ "Healthcare",
+    OCCP >= 3600 & OCCP <= 3655 ~ "Healthcare Support",
+    OCCP >= 3700 & OCCP <= 3960 ~ "Protective Services",
+    OCCP >= 4000 & OCCP <= 4160 ~ "Foods",
+    OCCP >= 4200 & OCCP <= 4255 ~ "Building Maintenance",
+    OCCP >= 4300 & OCCP <= 4655 ~ "Personal Care Services",
+    OCCP >= 4700 & OCCP <= 4965 ~ "Sales",
+    OCCP >= 5000 & OCCP <= 5940 ~ "Administrative Support",
+    OCCP >= 6005 & OCCP <= 6130 ~ "Farming",
+    OCCP >= 6200 & OCCP <= 6765 ~ "Construction",
+    OCCP >= 6800 & OCCP <= 6950 ~ "Extraction",
+    OCCP >= 7000 & OCCP <= 7640 ~ "Trades",
+    OCCP >= 7700 & OCCP <= 8990 ~ "Production",
+    OCCP >= 9005 & OCCP <= 9760 ~ "Transportation",
+    TRUE ~ "Other"
+  ))
+
+df$Gender <- ifelse(df$SEX == 1, "Male", "Female")
+df$Wage <- df$WAGP
+df$Age <- df$AGEP
+```
+
+```{r, include = FALSE}
+# Only occupation types of interest
+df2 <- df[df$OccupationType %in% c("Computer and Mathematical",
+                                  "Education",
+                                  "Engineering",
+                                  "Finance",
+                                  "Healthcare",
+                                  "Legal",
+                                  "Management",
+                                  "Science"),]
+# Only columns of interest
+df2 <- df2[,c("Gender",
+              "Age",
+              "OccupationType",
+              "Wage")]
+
+df2$LogWage <- log(df2$Wage)
+```
+
+## 4) Initial Data Plots and Summaries
+
+Here is a histogram of wages of individuals in the dataset.
+
+```{r, echo = FALSE, fig.align='center'}
+hist(df2$Wage, 
+     col ="skyblue",
+     breaks = 50,
+     main = "Wage Distribution",
+     xlim = c(0, 500000),
+     ylim = c(0, 1200),
+     xlab = "Wage ($)",
+     ylab = "Frequency")
+```
+
+It's clearly not very normally distributed, which is a vital assumption for some of the statistical tests done later in the analysis section of this paper. Here is a normal quantile plot of the wages to further demonstrate its non-normal distribution.
+
+```{r, echo = FALSE, fig.align='center'}
+qqPlot(df2$Wage, 
+       col = "skyblue", 
+       col.lines = "slateblue",
+       pch = 19,
+       id = FALSE,
+       main = "Normal Quantile Plot of Wages",
+       xlab = "Norm Quantiles",
+       ylab = "Wage ($)")  
+```
+
+For the purposes of achieving normality of data, the natural logarithm of the wage is used for these tests instead.
+
+```{r, echo = FALSE, fig.align='center'}
+hist(df2$LogWage, 
+     col ="skyblue",
+     breaks = 30,
+     main = "Log Wage Distribution",
+     ylim = c(0, 1200),
+     xlab = "Log Wage",
+     ylab = "Frequency")
+
+qqPlot(df2$LogWage, 
+       col = "skyblue", 
+       col.lines = "slateblue",
+       pch = 19,
+       id = FALSE,
+       main = "Normal Quantile Plot of Log Wage",
+       xlab = "Norm Quantiles",
+       ylab = "Log Wage")
+```
+
+The log wages are approximately normally distributed as demonstrated by the histogram and the normal quantile plot. The normal quantile plot does have some deviations near the ends caused by the wages being bounded by \$20,000 and \$715,000, but this should not cause any issues with the statistical tests.
+
+Now for the wage distribution comparisons between different demographics. First is gender:
+
+```{r, echo = FALSE, fig.align='center'}
+boxplot(LogWage ~ Gender, 
+        data=df2,
+        col = c(rgb(1, 0, 0, 0.25), rgb(0, 0, 1, 0.25)),
+        ylab = "Log Wage",
+        outcol = rgb(196/255, 139/255, 217/255, alpha = 0.1),
+        pch = 16,
+        main = "Female vs Male Log Wages")
+
+legend("topleft", legend = c("Female", "Male"),
+       fill = c(rgb(1, 0, 0, 0.25), rgb(0, 0, 1, 0.25)))
+
+wage_range <- range(df2$LogWage, na.rm = TRUE)
+
+# Plot male histogram first
+hist(df2$LogWage[df2$Gender == "Male"], 
+     col = rgb(0, 0, 1, 0.25),  # semi-transparent blue
+     xlim = wage_range,
+     ylim = c(0, 700),
+     breaks = 30,
+     main = "Log Wage Distribution by Gender",
+     xlab = "Log Wage",
+     ylab = "Frequency")
+
+# Overlay female histogram
+hist(df2$LogWage[df2$Gender == "Female"], 
+     col = rgb(1, 0, 0, 0.25),  # semi-transparent red
+     breaks = 30,
+     add = TRUE)
+
+legend("topright", legend = c("Female", "Male"),
+       fill = c(rgb(1, 0, 0, 0.25), rgb(0, 0, 1, 0.25)))
+```
+
+From an initial glance, it appears that salaries are higher for male individuals than for female individuals, which should not be particularly surprising.
+
+Now for age:
+
+```{r, echo = FALSE, fig.align='center'}
+plot(df2$Age, 
+     df2$LogWage,
+     col = rgb(135/255, 206/255, 235/255, alpha = 0.1),
+     pch = 16,
+     main = "Log Wage vs Age",
+     xlab = "Age (Years)",
+     ylab = "Log Wage")
+```
+
+Based on the density of the individual points, there appears to be a very slight positive correlation between age and log wage. This should also make sense; older individuals will likely have more years of experience and thus are more valuable as employees than, say, new hires.
+
+And lastly, salaries across different occupation types:
+
+```{r, echo = FALSE, fig.align='center'}
+par(mar = c(5, 4, 4, 10))
+
+occupation_levels <- sort(unique(df2$OccupationType))
+occupation_colors <- c("#1f78b4",
+                       "#a6cee3",
+                       "#33a02c",
+                       "#b15928",
+                       "#e31a1c",
+                       "#6a3d9a",
+                       "#ff7f00",
+                       "#cab2d6")
+
+df2$OccColor <- occupation_colors[match(df2$OccupationType, occupation_levels)]
+
+boxplot(LogWage ~ OccupationType, 
+        data = df2,
+        col = occupation_colors,
+        xaxt = "n",
+        las = 2,
+        main = "Log Wage by Occupation Type",
+        xlab = "Occupation Type",
+        ylab = "Log Wage")
+
+legend("topright", 
+       legend = occupation_levels, 
+       fill = occupation_colors,
+       cex = 0.7,
+       border = "black",
+       xpd = TRUE,
+       inset = c(-0.5, 0))
+```
+
+It seems that occupation types that fall under "Computer and Mathematical" have the highest median salaries, which makes sense considering the types of jobs in this category (e.g. software engineers, data scientists, statisticians, actuaries, etc.). Also not surprising is that Education jobs have the lowest median salaries.
+
+## 5) Analysis
+
+### 5.1) Differences in Log Wage by Gender
+
+Since the standard two-sample t-test assumes equal variance, the standard deviations of log wages for female and male individuals are compared to ensure their ratio is less than 2.
+
+```{r, echo = FALSE}
+female_std <- sd(df2$LogWage[df2$Gender == "Female"])
+sprintf("Std. Dev. of Log Wage for Female: %.3f", female_std)
+male_std <- sd(df2$LogWage[df2$Gender == "Male"])
+sprintf("Std. Dev. of Log Wage for Male: %.3f", male_std)
+sprintf("Ratio: %.3f", male_std / female_std)
+```
+
+The two-sample t-test is therefore a valid test to use here.
+
+```{r, echo = FALSE}
+t.test(df2$LogWage[df2$Gender == "Female"],
+       df2$LogWage[df2$Gender == "Male"],
+       alternative = "two.sided",
+       var.equal = TRUE,
+       conf.level = 0.95)
+```
+
+At the 0.05 significance level, the null hypothesis is rejected, indicating a statistically significant difference in mean log wages between men and women. Specifically, men have a higher average log wage than women.
+
+A permutation test provides further evidence for this difference. The histogram below displays the distribution of mean log wage differences from 1,000 simulated permutation samples, along with the observed difference between men and women. The observed value lies far outside the permutation distribution, yielding a p-value equal to zero and reinforcing the conclusion that a significant difference in mean log wages exists between men and women.
+
+```{r}
+n_perm <- 1000
+perm_diffs <- numeric(n_perm)
+
+obs_diff <- with(df2, mean(LogWage[Gender == "Female"]) - mean(LogWage[Gender == "Male"]))
+
+# Permutation test
+for (i in 1:n_perm) {
+  perm_labels <- sample(df2$Gender)
+  perm_diffs[i] <- with(df2, mean(LogWage[perm_labels == "Female"]) - 
+                          mean(LogWage[perm_labels == "Male"]))
+}
+
+# Plot histogram of permuted differences
+hist(perm_diffs,
+     main = "Permuted Mean Log Wage Differences by Gender",
+     xlab = "Difference in Mean Log Wages (Female - Male)",
+     col = "skyblue", border = "white",
+     xlim = c(-0.3, 0.04))
+abline(v = obs_diff, col = "palegreen", lwd = 2)
+
+text(x = obs_diff - 0.01, 
+     y = 10,
+     labels = "Observed Difference = -0.29", 
+     col = "darkgrey", 
+     srt = 90,  # rotate vertically
+     adj = 0) 
+```
+### 5.2) The Relation between Age and Log Wage
+
+```{r}
+n_boot <- 1000
+boot_corrs <- numeric(n_boot)
+
+for (i in 1:n_boot) {
+  sample_indices <- sample(1:nrow(df2), replace = TRUE)
+  sample_data <- df2[sample_indices, ]
+  boot_corrs[i] <- cor(sample_data$LogWage, sample_data$Age)
+}
+
+par(mar = c(5, 5, 5, 6))
+
+hist(boot_corrs,
+     main = "Bootstrap Distribution of Correlation (LogWage vs Age)",
+     xlab = "Correlation",
+     col = "skyblue",
+     border = "white")
+
+ci <- quantile(boot_corrs, c(0.025, 0.975))
+abline(v = ci, lwd = 3, col = "palegreen")
+abline(v = cor.test(df2$LogWage, df2$Age)$conf.int, lwd = 3, col = "slateblue", lty = 2)
+legend("topright", 
+       c("Theoretical CI","Boot CI"), 
+       lwd = 3,
+       xpd = TRUE,
+       inset = c(-0.25, 0),
+       col = c("slateblue","palegreen"), lty = c(2, 1))
+```
